@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// 학교 업무일지(데모 버전) Firestore 보안 규칙
+// - Firebase 콘솔 → Firestore Database → 「규칙」 탭에 이 내용을 통째로 붙여넣고 「게시」를 누릅니다.
+// - 로그인 없이 쓰는 앱이라, 아래 업무일지용 컬렉션에 한해 누구나 읽고 쓸 수 있게 엽니다.
+//   그 밖의 경로는 모두 막혀 있습니다.
+// - 따라서 앱 주소를 아는 사람은 내용을 보고 고칠 수 있습니다.
+//   주소는 교직원끼리만 나누고, 학생 개인정보·민감한 정보는 넣지 않습니다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /artifacts/{appId}/public/data/{collectionName}/{docId} {
+      allow read, write: if collectionName in [
+        'calendarEvents',
+        'weeklyNotes',
+        'schoolHolidays',
+        'eduReflections',
+        'academicConfig',
+        'officeSections',
+        'officeMaterials',
+        'demoMeta'
+      ];
+    }
+  }
+}
