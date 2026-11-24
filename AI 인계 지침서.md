@@ -55,7 +55,7 @@
 
 ### 3-1. 시작 설정(BOOT)
 
-`doGet` → `getBootJson_()`이 아래 JSON을 만들어 `index.html`의 `<script type="application/json" id="bootConfig"><?!= bootJson ?></script>`에 넣습니다(`<`는 `<`로 이스케이프). 비밀값은 넣지 않습니다.
+`doGet` → `getBootJson_()`이 아래 JSON을 만들어 `index.html`의 `<script type="application/json" id="bootConfig"><?!= bootJson ?></script>`에 넣습니다(`<` 문자는 `\u003c`로 이스케이프. U+2028/2029도 같은 방식). 비밀값은 넣지 않습니다.
 
 ```json
 { "schoolName": "…", "schoolKind": "중학교", "neisReady": true,
@@ -77,6 +77,7 @@ const appId = usingSharedDb && BOOT.dataSpace ? `${firebaseConfig.appId}__${BOOT
 // 모든 경로: artifacts/${appId}/public/data/<컬렉션>/<문서>
 ```
 
+- **2026-11-24 이전 코드**(학교별 설정 도입 전)는 접미사 없는 `artifacts/{공용 appId}/…` 칸을 썼습니다. 그 코드로 배포한 앱을 새 코드로 바꾸면 스크립트별 칸으로 옮겨 가 예시가 새로 채워지고, 옛 칸 데이터는 남지만 화면에 보이지 않습니다. 옛 칸을 함부로 지우지 마세요.
 - **공용 체험 DB**: 제작자의 Firebase 프로젝트 `school-worklog-demo`(Firestore, 서울 리전). 여러 학교 배포가 함께 쓰므로 `dataSpace = 's' + md5(ScriptApp.getScriptId()).slice(0,12)`로 **스크립트 프로젝트마다 칸을 나눕니다**(`sharedDataSpace_`). 같은 스크립트를 재배포해도 칸은 같고, 새 스크립트 프로젝트를 만들면 새 칸(빈 상태 → 예시 자동 채움)입니다.
 - **우리 학교 Firebase**: 관리자가 붙여넣은 설정을 스크립트 속성 `FIREBASE_CONFIG`(JSON)에 저장. 이때는 칸 이름을 붙이지 않고 `appId` 그대로 씁니다.
 - 두 경우 모두 같은 `firestore.rules`를 씁니다: `artifacts/{appId}/public/data/{컬렉션}/{문서}` 중 허용 목록 8개 컬렉션만 누구나 읽기·쓰기. **새 컬렉션을 추가하면 규칙에도 추가해야 하고, 이미 배포한 학교는 규칙을 다시 게시해야 합니다**(공용 체험 DB는 제작자가 `firebase deploy --only firestore`).
@@ -195,11 +196,16 @@ PORT=8799 HARNESS_PROPS='{"DEMO_ADMIN_CODE":"demo-pass"}' node 개발용/local-h
 - 서버 함수 직접 호출: `curl -X POST "localhost:8765/gas?as=anon" -H 'Content-Type: application/json' -d '{"fn":"neisFetch","args":["mealServiceDietInfo",{…},false]}'`
 - 상태 보기 `/__state`, 값 바꾸기 `/__set?prop=KEY&value=V`, `/__set?ai=busy`(429 흉내).
 - 문법 검사: `code.gs`는 `.js`로 복사해 `node --check`, `index.html`은 `<script type="module">` 안쪽만 잘라 `.mjs`로 `node --check`.
+- 하네스 기본 데이터 칸은 `artifacts/1:605184127791:web:9ffae871bf0b1b62dca7da__sd901145e78cc`(가짜 스크립트 ID의 칸)입니다. 시험 뒤 지울 때는 **이 칸만** 지우고, 접미사 없는 `artifacts/1:605184127791:web:9ffae871bf0b1b62dca7da`(옛 코드 배포가 쓰는 칸)나 다른 `__s…` 칸(다른 학교 배포)은 건드리지 마세요.
+- Claude 데스크톱의 미리보기 서버(preview_start)로 하네스를 띄우면 서버가 curl을 실행할 때 종료(SIGTERM 143)되는 일이 있었습니다. **셸에서 `node 개발용/local-harness.js`로 띄우고 브라우저만 그 주소로 여는** 편이 안정적입니다.
 - **하네스로 확인할 수 없는 것**: 실제 GAS 권한 승인·배포, 익명 접속 시 `Session` 동작, 실제 Gemini 응답, 실제 드라이브 폴더·공유·PDF 변환, HtmlService 샌드박스(다운로드·팝업·`target="_top"`). 이런 변경은 사용자에게 "배포해서 확인해 주세요"라고 분명히 말합니다.
 
 ## 10. 자주 하는 수정
 
 - **화면 문구·라벨 바꾸기**: `index.html`에서 해당 문구 검색. 부서 표시 이름은 `REFLECTION_DEPT_LABELS`·`OFFICE_DEPT_LABELS`.
+- **부서 목록이 박혀 있는 곳**(학교마다 부서가 달라 바꾸려 할 때 모두 함께 봐야 함): `index.html` — 일정 입력 모달·AI 업무 입력기의 부서 `<option>`, 성찰 입력 모달 `<option>`, `REFLECTION_PRIMARY_DEPTS`, `OFFICE_DEPTS`, `ViewRenderer.renderWeeklyPlan`의 `dailyCategories`·`weeklyNoteRowsConfig`, `FirebaseService.checkAndShowWeeklyNotePopup`의 `categoriesToShow`, `ExportService`의 `allowedDepartments`, `Utils.normalizeDepartment`, `ApiService.getAiTaskPrompt` 문장 / `code.gs` — `OFFICE_DEPARTMENTS`. 내부값을 바꾸면 기존 데이터가 어긋나므로 먼저 6장의 부서 값 규칙을 보세요.
+- **`appsscript.json`의 OAuth 범위를 바꾸면** 배포한 사람이 스크립트 편집기에서 `setupDemo`를 한 번 실행해 다시 승인해야 합니다(웹 앱만 새 버전으로 배포하면 권한 오류가 날 수 있음). 사용 방법 문서에도 그 안내를 넣으세요.
+- **정규식·문자열에 U+2028/U+2029를 그대로 넣지 마세요**(JS 문법 오류). `String.fromCharCode(0x2028)`처럼 만듭니다. 일부 AI 편집 도구는 `\uXXXX`를 실제 문자로 바꿔 쓰므로, 이런 이스케이프가 들어간 줄은 저장 뒤 실제 바이트를 확인하세요.
 - **새 설정 추가**: `CONFIG_DEFAULTS`에 키 추가 → 필요하면 `ADMIN_SETTING_ITEMS`(관리 정보 표) → 화면에서 필요하면 `getBootJson_`에 비밀이 아닌 값만 추가 → 「처음 설정」에서 입력받으려면 `saveSchoolSettings`와 `AdminInfoService.setupHtml`/`runAction`.
 - **새 서버 함수**: 익명 호출이 위험하면 `requireAdmin_(adminCode)`를 첫 줄에, 비용이 드는 외부 호출이면 `demoUseQuota_`를. 내부용은 이름 끝에 `_`.
 - **새 Firestore 컬렉션**: `firestore.rules` 허용 목록에 추가 + `DEMO_COLLECTIONS`(초기화 대상)에 추가 + 사용 방법 문서에 "규칙 다시 게시" 안내.
@@ -213,6 +219,7 @@ PORT=8799 HARNESS_PROPS='{"DEMO_ADMIN_CODE":"demo-pass"}' node 개발용/local-h
 - 구글 캘린더 동기화 없음(의도). 로그인 기반 버전에만 있음.
 - 계획 시트 기본틀은 제작자 드라이브의 시트(링크 보기 공유)를 복사합니다. 기본틀 셀 위치(`populateMonthlyPlanningSheet_`의 `B5:E35`, 주간 `B2`·`B3`·9행부터 등)에 강하게 묶여 있어, 다른 기본틀을 쓰려면 같은 구조여야 합니다.
 - 하루 한도·잠금은 스크립트 속성·캐시 기반이라 아주 많은 동시 요청에서는 대략적입니다.
+- 관리자 암호 10회 잠금은 **스크립트 전체 공통**입니다. 누가 일부러 계속 틀리면 10분 동안 관리자도 암호로는 못 들어갑니다(배포 계정으로 로그인하면 들어감).
 
 ## 12. 끝내기 전 확인 목록
 
